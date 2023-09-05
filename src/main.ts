@@ -1,33 +1,50 @@
 import express from 'express';
 import fs from 'fs';
-import path from 'path';
 
-const { dlAudio } = require("youtube-exec");
+const ytdl = require('ytdl-core');
 
 const app = express();
 app.use(express.json());
 const port = 3000;
 
+
+// Opções para a qualidade do áudio (aqui, estamos usando a melhor qualidade)
+const audioOptions = {
+  quality: 'highestaudio',
+};
+
+// Função para baixar e salvar o áudio
+const downloadAudio = async (videoURL: any) => {
+  try {
+    const info = await ytdl.getInfo(videoURL);
+    const audioFormat = ytdl.chooseFormat(info.formats, audioOptions);
+
+    if (audioFormat) {
+      const audioStream = ytdl.downloadFromInfo(info, audioOptions);
+      const audioFileName = `${info.videoDetails.title.replace(/[^a-zA-Z0-9]/g, '_')}.mp3`;
+
+      audioStream.pipe(fs.createWriteStream(audioFileName));
+
+      audioStream.on('end', () => {
+        console.log(`Áudio baixado e salvo como ${audioFileName}`);
+      });
+    } else {
+      console.error('Não foi possível encontrar um formato de áudio adequado.');
+    }
+  } catch (error) {
+    console.error('Ocorreu um erro ao baixar o áudio:', error);
+  }
+};
+
 // Define a route for /download
 app.post('/download', async (req, res) => {
   const {url} = req.body;
 
-  const name = url.split('v=')[1];
-  const filename = name.split('&')[0];
+  await downloadAudio(url);
 
-  try {
-    const teste = await dlAudio({
-      url,
-      filename,
-      quality: "best",
-    });
-    console.log(teste)
-    console.log("Audio downloaded successfully! 🔊🎉");
-  } catch (err: any) {
-    console.error("An error occurred:", err.message);
-  }
-  
+  return res.json({message: 'ok'});
 });
+
 
 // Start the Express server
 app.listen(port, () => {
